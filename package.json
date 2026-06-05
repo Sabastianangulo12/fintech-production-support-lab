@@ -1,0 +1,28 @@
+{
+  "name": "fintech-production-support-lab",
+  "version": "0.1.0",
+  "description": "Synthetic fintech production-support lab for investigating mock payment incidents with SQL, vendor events, and support-ready audit reports.",
+  "private": false,
+  "type": "module",
+  "scripts": {
+    "build": "tsc --noEmit",
+    "dev": "tsx src/index.ts",
+    "investigate": "tsx src/index.ts investigate TCK-1001",
+    "lint": "tsc --noEmit"
+  },
+  "keywords": [
+    "fintech",
+    "production-support",
+    "typescript",
+    "sql",
+    "payments",
+    "support-engineering"
+  ],
+  "author": "Sabastian Angulo",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.14.10",
+    "tsx": "^4.16.2",
+    "typescript": "^5.5.3"
+  }
+}
