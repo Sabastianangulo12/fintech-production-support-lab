@@ -1,34 +1,58 @@
-import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { mkdir, writeFile } from "node:fs/promises";
+import { dirname } from "node:path";
+import { investigateTicket } from "./investigation.js";
+import { reportFile } from "./paths.js";
+import { renderMarkdownReport } from "./report.js";
 
-const [, , command, ticketId = "TCK-1001"] = process.argv;
+interface CliOptions {
+  command: string;
+  ticketId: string;
+  write: boolean;
+  json: boolean;
+}
 
-const dataFiles = [
-  "data/schema.sql",
-  "data/seed.sql",
-  "data/vendor-events/card-auth-events.json"
-];
+async function main(): Promise<void> {
+  const options = parseArgs(process.argv.slice(2));
 
-function printInvestigationScaffold(selectedTicketId: string): void {
-  console.log(`Fintech Production Support Lab`);
-  console.log(`Investigation scaffold for ticket: ${selectedTicketId}`);
-  console.log("");
-  console.log("Synthetic data sources:");
-
-  for (const file of dataFiles) {
-    const status = existsSync(join(process.cwd(), file)) ? "ready" : "missing";
-    console.log(`- ${file} (${status})`);
+  if (options.command !== "investigate") {
+    throw new Error(`Unknown command: ${options.command}. Try: npm run investigate`);
   }
 
-  console.log("");
-  console.log("Next implementation step:");
-  console.log("Wire the SQL seed data and mock vendor events into a repeatable investigation report.");
+  const result = await investigateTicket(options.ticketId);
+
+  if (options.json) {
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+
+  const report = renderMarkdownReport(result);
+
+  if (options.write) {
+    const outputPath = reportFile(`${options.ticketId}-investigation.md`);
+    await mkdir(dirname(outputPath), { recursive: true });
+    await writeFile(outputPath, report, "utf8");
+    console.log(`Wrote investigation report: ${outputPath}`);
+    return;
+  }
+
+  console.log(report);
 }
 
-if (!command || command === "investigate") {
-  printInvestigationScaffold(ticketId);
-} else {
-  console.error(`Unknown command: ${command}`);
-  console.error("Try: npm run investigate");
-  process.exitCode = 1;
+function parseArgs(args: string[]): CliOptions {
+  const [command = "investigate", maybeTicketId] = args;
+  const flags = new Set(args.filter((arg) => arg.startsWith("--")));
+  const ticketId = maybeTicketId && !maybeTicketId.startsWith("--") ? maybeTicketId : "TCK-1001";
+
+  return {
+    command,
+    ticketId,
+    write: flags.has("--write"),
+    json: flags.has("--json")
+  };
 }
+
+main().catch((error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error);
+  console.error(`Investigation failed: ${message}`);
+  process.exitCode = 1;
+});

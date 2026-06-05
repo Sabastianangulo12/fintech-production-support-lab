@@ -8,7 +8,10 @@
     "build": "tsc --noEmit",
     "dev": "tsx src/index.ts",
     "investigate": "tsx src/index.ts investigate TCK-1001",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "report": "tsx src/index.ts investigate TCK-1001 --write",
+    "test": "vitest run",
+    "verify": "npm run build && npm run test && npm run investigate"
   },
   "keywords": [
     "fintech",
@@ -22,7 +25,12 @@
   "license": "MIT",
   "devDependencies": {
     "@types/node": "^20.14.10",
+    "@types/sql.js": "^1.4.11",
     "tsx": "^4.16.2",
-    "typescript": "^5.5.3"
+    "typescript": "^5.5.3",
+    "vitest": "^4.1.8"
+  },
+  "dependencies": {
+    "sql.js": "^1.14.1"
   }
 }

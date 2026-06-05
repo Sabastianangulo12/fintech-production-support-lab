@@ -26,27 +26,32 @@ The intended support workflow:
 - Query fake internal records for account, payment, ledger, and support-ticket state.
 - Review mock vendor events for authorization, decline, reversal, and webhook timing.
 - Summarize likely customer impact without over-claiming.
-- Produce an audit trail and a handoff report with next actions.
+- Produce an audit trail and a CX/engineering handoff report with next actions.
 
 ## Tech Stack
 
 - Node.js
 - TypeScript
+- SQLite via `sql.js`
 - SQL schema and seed data
-- Mock JSON vendor events
+- Mock JSON vendor events behind a small vendor-client abstraction
 - CLI-first workflow for reproducible investigations
+- Vitest coverage for the core investigation logic
 
-Planned additions include a small REST API, SQLite-backed investigation runner, report generation, and optional AI-assisted wording checks for support communications.
+Planned additions include a small REST API surface, more incident scenarios, and optional AI-assisted wording checks for support communications.
 
 ## Project Structure
 
 ```text
 docs/
+  mock-vendor-api.md
+  runbook.md
   scope.md
 data/
   schema.sql
   seed.sql
   vendor-events/
+reports/
 src/
   index.ts
 ```
@@ -56,10 +61,35 @@ src/
 ```bash
 npm install
 npm run build
+npm test
 npm run investigate
 ```
 
-At this initial scaffold stage, the CLI prints the selected scenario and points to the fake data sources. The next implementation step is to wire the SQL seed data into an investigation runner.
+To write the generated Markdown handoff into `reports/`:
+
+```bash
+npm run report
+```
+
+To run the full verification pass:
+
+```bash
+npm run verify
+```
+
+## Example Output
+
+```text
+# Investigation Report: TCK-1001
+
+## Disposition
+Likely customer-visible pending authorization after a declined card attempt; no settled debit found in the synthetic internal ledger.
+
+## Customer Impact
+Customer may see the $84.27 pending hold while the reversal/release completes. Mock vendor release guidance is 1-3 business days.
+```
+
+The full report includes SQL evidence, vendor event correlation, known facts, CX response draft, engineering handoff, audit trail, and operational improvement ideas.
 
 ## Safety And Data Boundaries
 
@@ -78,3 +108,7 @@ This project is meant to demonstrate practical readiness for fintech production/
 - Communicating clearly to CX and engineering.
 - Separating known facts from assumptions.
 - Creating repeatable workflows that reduce operational toil.
+
+## Role Alignment
+
+The public OnePay Product Support Engineer posting emphasizes bridging Engineering and Customer Experience, investigating production issues, using SQL and API calls against vendor systems, TypeScript/Node.js interest, operational improvements, and clear written communication. This lab is intentionally aimed at those exact muscles while remaining independent, synthetic, and safe.
