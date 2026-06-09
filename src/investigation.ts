@@ -1,3 +1,4 @@
+import { buildCxDraftAssist } from "./cxDraftRules.js";
 import { loadSeededDatabase } from "./database.js";
 import { formatMoney } from "./format.js";
 import { dataFile } from "./paths.js";
@@ -72,7 +73,7 @@ export async function investigateTicket(
     const engineeringHandoff = buildEngineeringHandoff(paymentAttempt, ledgerEntries, vendorEvents);
     const timeline = buildTimeline(ticket, paymentAttempt, transactions, ledgerEntries, fixAuditLog, vendorEvents);
     const auditTrail = buildAuditTrail(generatedAt, ticket, paymentAttempt, transactions, ledgerEntries, vendorEvents);
-    const cxDraft = buildCxDraft(paymentAttempt, vendorEvents);
+    const cxDraftAssist = buildCxDraftAssist(paymentAttempt, ledgerEntries, vendorEvents);
 
     return {
       generatedAt,
@@ -90,7 +91,8 @@ export async function investigateTicket(
       findings,
       disposition,
       customerImpact,
-      cxDraft,
+      cxDraft: cxDraftAssist.draft,
+      cxDraftReview: cxDraftAssist.review,
       engineeringHandoff,
       auditTrail,
       operationalImprovements: buildOperationalImprovements()
@@ -112,9 +114,12 @@ function buildFindings(
   const pendingHold = ledgerEntries.find(
     (entry) => entry.entry_type === "authorization_hold" && entry.status === "pending_release"
   );
+  const achDebit = ledgerEntries.find((entry) => entry.entry_type === "ach_debit");
+  const achReturn = ledgerEntries.find((entry) => entry.entry_type === "ach_return");
   const vendorDecline = vendorEvents.find((event) => event.type === "authorization.declined");
   const reversalQueued = vendorEvents.find((event) => event.type === "authorization.reversal_queued");
   const reversalCompleted = vendorEvents.find((event) => event.type === "authorization.reversal_completed");
+  const achReturnReceived = vendorEvents.find((event) => event.type === "ach.return.received");
 
   if (paymentAttempt.status === "declined" && vendorDecline) {
     findings.push({
@@ -125,13 +130,31 @@ function buildFindings(
     });
   }
 
-  if (captureEntries.length === 0) {
+  if (paymentAttempt.payment_method_type === "card" && captureEntries.length === 0) {
     findings.push({
       severity: "info",
       title: "No settled debit found",
       detail:
         "The synthetic ledger has no capture entry for this payment attempt, so the evidence does not support calling this a completed charge.",
       evidence: ledgerEntries.map((entry) => entry.id)
+    });
+  }
+
+  if (paymentAttempt.status === "returned" && achReturnReceived) {
+    findings.push({
+      severity: "info",
+      title: "Internal and vendor ACH return states match",
+      detail: `Internal payment ${paymentAttempt.id} is returned and vendor event ${achReturnReceived.id} reports an ACH return for ${amount}.`,
+      evidence: [paymentAttempt.id, achReturnReceived.id]
+    });
+  }
+
+  if (achDebit && achReturn && achDebit.amount_cents + achReturn.amount_cents === 0) {
+    findings.push({
+      severity: "info",
+      title: "ACH debit is offset by posted return",
+      detail: `Ledger entry ${achDebit.id} is offset by return entry ${achReturn.id}, so the synthetic ledger nets this returned ACH attempt to zero.`,
+      evidence: [achDebit.id, achReturn.id]
     });
   }
 
@@ -172,9 +195,14 @@ function buildDisposition(
 ): string {
   const hasCapture = ledgerEntries.some((entry) => entry.entry_type === "capture");
   const hasDecline = vendorEvents.some((event) => event.type === "authorization.declined");
+  const hasAchReturn = vendorEvents.some((event) => event.type === "ach.return.received");
 
   if (paymentAttempt.status === "declined" && hasDecline && !hasCapture) {
     return "Likely customer-visible pending authorization after a declined card attempt; no settled debit found in the synthetic internal ledger.";
+  }
+
+  if (paymentAttempt.status === "returned" && hasAchReturn) {
+    return "ACH debit returned after settlement; synthetic ledger includes an offsetting return entry and CX should explain the return without promising bank-side timing.";
   }
 
   return "Needs deeper review because internal payment state, ledger state, and vendor event state do not fully align.";
@@ -186,30 +214,24 @@ function buildCustomerImpact(
   vendorEvents: VendorEvent[]
 ): string {
   const amount = formatMoney(paymentAttempt.amount_cents, paymentAttempt.currency);
+  const achReturnReceived = vendorEvents.find((event) => event.type === "ach.return.received");
   const pendingHold = ledgerEntries.some(
     (entry) => entry.entry_type === "authorization_hold" && entry.status === "pending_release"
   );
   const reversalQueued = vendorEvents.find((event) => event.type === "authorization.reversal_queued");
   const releaseWindow = getStringPayloadValue(reversalQueued, "expectedReleaseWindow") ?? "the vendor release window";
 
+  if (paymentAttempt.payment_method_type === "ach" && achReturnReceived) {
+    const returnCode = getStringPayloadValue(achReturnReceived, "returnCode") ?? "the mock return code";
+    const reason = getStringPayloadValue(achReturnReceived, "reason") ?? "a synthetic ACH return reason";
+    return `Customer's ${amount} ACH debit was returned with synthetic code ${returnCode} (${reason}). The ledger has a posted return offset; CX should avoid promising exact bank-side timing.`;
+  }
+
   if (pendingHold) {
     return `Customer may see the ${amount} pending hold while the reversal/release completes. Mock vendor release guidance is ${releaseWindow}.`;
   }
 
   return `No active synthetic hold is visible in the internal ledger for the ${amount} payment attempt.`;
-}
-
-function buildCxDraft(paymentAttempt: PaymentAttemptRecord, vendorEvents: VendorEvent[]): string {
-  const amount = formatMoney(paymentAttempt.amount_cents, paymentAttempt.currency);
-  const reversalQueued = vendorEvents.find((event) => event.type === "authorization.reversal_queued");
-  const releaseWindow = getStringPayloadValue(reversalQueued, "expectedReleaseWindow") ?? "the normal release window";
-
-  return [
-    `Thanks for flagging this. We reviewed the payment attempt for ${amount}.`,
-    "The checkout attempt did not complete, and our records do not show a settled charge.",
-    `A pending authorization can still appear in a bank app while the hold release finishes. The mock vendor timeline shows the release was queued, with expected release guidance of ${releaseWindow}.`,
-    "If the pending hold remains after that window, we should re-check the vendor timeline and escalate with the payment reference."
-  ].join(" ");
 }
 
 function buildEngineeringHandoff(
@@ -221,6 +243,22 @@ function buildEngineeringHandoff(
     (entry) => entry.entry_type === "authorization_hold" && entry.status === "pending_release"
   );
   const reversalQueued = vendorEvents.find((event) => event.type === "authorization.reversal_queued");
+  const achReturnReceived = vendorEvents.find((event) => event.type === "ach.return.received");
+
+  if (paymentAttempt.payment_method_type === "ach" && achReturnReceived) {
+    return {
+      summary: `Payment ${paymentAttempt.id} is returned, vendor reference ${paymentAttempt.vendor_reference} has ACH return event ${achReturnReceived.id}, and the ledger has a posted return offset.`,
+      suspectedArea: "Synthetic ACH return reconciliation",
+      requestedAction:
+        "Confirm the ACH return reason is surfaced to CX and add monitoring for ACH payments that show settled without a matching return offset after a return event.",
+      evidence: [
+        paymentAttempt.id,
+        paymentAttempt.vendor_reference,
+        ...ledgerEntries.map((entry) => entry.id),
+        ...vendorEvents.map((event) => event.id)
+      ]
+    };
+  }
 
   return {
     summary: `Payment ${paymentAttempt.id} is declined, vendor reference ${paymentAttempt.vendor_reference} has a queued reversal/release event, and no capture ledger entry exists.`,
@@ -331,7 +369,7 @@ function buildAuditTrail(
     {
       at: generatedAt,
       actor: "support-lab-cli",
-      action: "Fetched matching mock vendor authorization events",
+      action: "Fetched matching mock vendor events",
       evidence: vendorEvents.map((event) => event.id).join(", ")
     },
     {
@@ -347,7 +385,9 @@ function buildOperationalImprovements(): string[] {
   return [
     "Add an automated queue for authorization holds that remain pending_release beyond the vendor release window.",
     "Generate a support-safe CX draft only after internal ledger state and vendor event state are both attached to the ticket.",
-    "Add a webhook reconciliation check that alerts when authorization.reversal_queued is not followed by authorization.reversal_completed."
+    "Add a webhook reconciliation check that alerts when authorization.reversal_queued is not followed by authorization.reversal_completed.",
+    "Add ACH return monitoring that checks for returned payment attempts without a matching posted ledger offset.",
+    "Run deterministic CX draft checks before a response is handed to Customer Experience."
   ];
 }
 

@@ -5,13 +5,19 @@
   "private": false,
   "type": "module",
   "scripts": {
+    "api": "tsx src/index.ts api --port 3000",
     "build": "tsc --noEmit",
     "dev": "tsx src/index.ts",
     "investigate": "tsx src/index.ts investigate TCK-1001",
+    "investigate:ach": "tsx src/index.ts investigate TCK-1002",
     "lint": "tsc --noEmit",
     "report": "tsx src/index.ts investigate TCK-1001 --write",
+    "report:ach": "tsx src/index.ts investigate TCK-1002 --write",
+    "reports": "npm run report && npm run report:ach && npm run report:stale-holds",
+    "report:stale-holds": "tsx src/index.ts stale-holds --write",
+    "stale-holds": "tsx src/index.ts stale-holds",
     "test": "vitest run",
-    "verify": "npm run build && npm run test && npm run investigate"
+    "verify": "npm run build && npm run test && npm run investigate && npm run investigate:ach && npm run stale-holds"
   },
   "keywords": [
     "fintech",

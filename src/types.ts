@@ -97,6 +97,12 @@ export interface VendorEvent {
   payload: Record<string, unknown>;
 }
 
+export interface CxDraftReview {
+  mode: "deterministic-rule-check";
+  guardrails: string[];
+  checks: string[];
+}
+
 export interface TimelineEntry {
   at: string;
   source: "support" | "internal-sql" | "vendor-api" | "fix-audit-log";
@@ -143,7 +149,21 @@ export interface InvestigationResult {
   disposition: string;
   customerImpact: string;
   cxDraft: string;
+  cxDraftReview: CxDraftReview;
   engineeringHandoff: EngineeringHandoff;
   auditTrail: AuditTrailEntry[];
   operationalImprovements: string[];
+}
+
+export interface PendingAuthorizationHoldRecord {
+  ledger_entry_id: string;
+  payment_attempt_id: string;
+  ticket_id: string | null;
+  customer_id: string;
+  account_id: string;
+  amount_cents: number;
+  currency: string;
+  ledger_status: string;
+  vendor_reference: string;
+  hold_created_at: string;
 }

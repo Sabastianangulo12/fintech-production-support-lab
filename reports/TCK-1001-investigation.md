@@ -51,6 +51,11 @@ Customer may see the $84.27 pending hold while the reversal/release completes. M
 ## CX Response Draft
 Thanks for flagging this. We reviewed the payment attempt for $84.27. The checkout attempt did not complete, and our records do not show a settled charge. A pending authorization can still appear in a bank app while the hold release finishes. The mock vendor timeline shows the release was queued, with expected release guidance of 1-3 business days. If the pending hold remains after that window, we should re-check the vendor timeline and escalate with the payment reference.
 
+## AI-Assisted Draft Checks
+- Mode: deterministic-rule-check
+- Guardrails: Separate confirmed evidence from likely customer impact.; Do not imply a real payment network, bank, or processor was contacted.; Use synthetic identifiers only.; Do not call a pending authorization a completed charge without capture evidence.; Describe release windows as guidance, not a guarantee.
+- Checks: Pass: no guarantee language.; Pass: draft says records do not show a settled charge.
+
 ## Engineering Handoff
 - Summary: Payment pay_1001 is declined, vendor reference ven_auth_8f41_demo has a queued reversal/release event, and no capture ledger entry exists.
 - Suspected area: Synthetic card authorization webhook reconciliation
@@ -58,12 +63,14 @@ Thanks for flagging this. We reviewed the payment attempt for $84.27. The checko
 - Evidence: pay_1001; ven_auth_8f41_demo; led_1001_auth_hold; led_1001_decline_marker; evt_vendor_1001_auth_requested; evt_vendor_1001_auth_declined; evt_vendor_1001_reversal_queued
 
 ## Audit Trail
-- Jun 9, 2026, 1:27:49 PM UTC: support-lab-cli: Loaded support ticket from SQLite seed data. Evidence: TCK-1001.
-- Jun 9, 2026, 1:27:49 PM UTC: support-lab-cli: Queried payment attempt, transaction, and ledger entries. Evidence: pay_1001, txn_1001, led_1001_auth_hold, led_1001_decline_marker.
-- Jun 9, 2026, 1:27:49 PM UTC: support-lab-cli: Fetched matching mock vendor authorization events. Evidence: evt_vendor_1001_auth_requested, evt_vendor_1001_auth_declined, evt_vendor_1001_reversal_queued.
-- Jun 9, 2026, 1:27:49 PM UTC: support-lab-cli: Generated CX draft and engineering handoff from known evidence. Evidence: report.
+- Jun 9, 2026, 1:40:23 PM UTC: support-lab-cli: Loaded support ticket from SQLite seed data. Evidence: TCK-1001.
+- Jun 9, 2026, 1:40:23 PM UTC: support-lab-cli: Queried payment attempt, transaction, and ledger entries. Evidence: pay_1001, txn_1001, led_1001_auth_hold, led_1001_decline_marker.
+- Jun 9, 2026, 1:40:23 PM UTC: support-lab-cli: Fetched matching mock vendor events. Evidence: evt_vendor_1001_auth_requested, evt_vendor_1001_auth_declined, evt_vendor_1001_reversal_queued.
+- Jun 9, 2026, 1:40:23 PM UTC: support-lab-cli: Generated CX draft and engineering handoff from known evidence. Evidence: report.
 
 ## Operational Improvements
 - Add an automated queue for authorization holds that remain pending_release beyond the vendor release window.
 - Generate a support-safe CX draft only after internal ledger state and vendor event state are both attached to the ticket.
 - Add a webhook reconciliation check that alerts when authorization.reversal_queued is not followed by authorization.reversal_completed.
+- Add ACH return monitoring that checks for returned payment attempts without a matching posted ledger offset.
+- Run deterministic CX draft checks before a response is handed to Customer Experience.

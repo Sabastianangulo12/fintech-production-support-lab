@@ -20,6 +20,8 @@ Production support in fintech is part debugging, part incident response, part cu
 
 The first scenario is `TCK-1001`: a synthetic customer says their card payment was declined, but they still see a pending hold.
 
+The second scenario is `TCK-1002`: a synthetic customer asks why an ACH debit appeared complete, then reversed after a mock return event.
+
 The intended support workflow:
 
 - Identify the customer and payment attempt from the ticket.
@@ -27,6 +29,8 @@ The intended support workflow:
 - Review mock vendor events for authorization, decline, reversal, and webhook timing.
 - Summarize likely customer impact without over-claiming.
 - Produce an audit trail and a CX/engineering handoff report with next actions.
+- Expose the same investigation through a REST API.
+- Run an ops automation script that finds stale authorization holds.
 
 ## Tech Stack
 
@@ -54,6 +58,7 @@ data/
 reports/
 src/
   index.ts
+  server.ts
 ```
 
 ## Getting Started
@@ -63,18 +68,37 @@ npm install
 npm run build
 npm test
 npm run investigate
+npm run investigate:ach
+npm run stale-holds
 ```
 
 To write the generated Markdown handoff into `reports/`:
 
 ```bash
 npm run report
+npm run report:ach
+npm run report:stale-holds
 ```
 
 To run the full verification pass:
 
 ```bash
 npm run verify
+```
+
+To start the local REST API:
+
+```bash
+npm run api
+```
+
+Example endpoints:
+
+```text
+GET /health
+GET /tickets/TCK-1001/investigation
+GET /tickets/TCK-1001/investigation/report
+GET /tickets/TCK-1002/investigation
 ```
 
 ## Example Output
@@ -89,9 +113,10 @@ Likely customer-visible pending authorization after a declined card attempt; no 
 Customer may see the $84.27 pending hold while the reversal/release completes. Mock vendor release guidance is 1-3 business days.
 ```
 
-The full report includes SQL evidence, vendor event correlation, known facts, CX response draft, engineering handoff, audit trail, and operational improvement ideas.
+The full report includes SQL evidence, vendor event correlation, known facts, deterministic AI-style CX draft checks, CX response draft, engineering handoff, audit trail, and operational improvement ideas.
 
-The SQLite seed data includes synthetic `customers`, `accounts`, `payment_attempts`, `transactions`, `ledger_entries`, `vendor_events`, `support_tickets`, `investigation_notes`, and `fix_audit_log` records for the first incident.
+The SQLite seed data includes synthetic `customers`, `accounts`, `payment_attempts`, `transactions`, `ledger_entries`, `vendor_events`, `support_tickets`, `investigation_notes`, and `fix_audit_log` records for both incidents.
+The ACH incident uses the same fake data model and adds return-specific vendor events and ledger offsets.
 
 ## Safety And Data Boundaries
 

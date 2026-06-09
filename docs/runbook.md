@@ -1,6 +1,7 @@
 # Investigation Runbook
 
 This runbook describes the synthetic workflow behind `TCK-1001`.
+The same workflow also covers `TCK-1002`, the synthetic ACH return scenario.
 
 ## Command
 
