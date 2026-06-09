@@ -10,6 +10,9 @@ describe("investigateTicket", () => {
 
     expect(result.ticket.id).toBe("TCK-1001");
     expect(result.paymentAttempt.status).toBe("declined");
+    expect(result.transactions).toHaveLength(1);
+    expect(result.vendorEventRows).toHaveLength(3);
+    expect(result.fixAuditLog).toHaveLength(2);
     expect(result.vendorEvents.map((event) => event.type)).toEqual([
       "authorization.requested",
       "authorization.declined",
@@ -40,6 +43,8 @@ describe("investigateTicket", () => {
     expect(report).toContain("# Investigation Report: TCK-1001");
     expect(report).toContain("## CX Response Draft");
     expect(report).toContain("## Engineering Handoff");
+    expect(report).toContain("SQLite vendor_events mirror");
+    expect(report).toContain("fix_audit_log rows");
     expect(report).toContain("1-3 business days");
     expect(report).toContain("No settled debit found");
   });

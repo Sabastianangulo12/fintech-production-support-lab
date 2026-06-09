@@ -5,12 +5,14 @@ import { InvestigationRepository } from "./repository.js";
 import type {
   AuditTrailEntry,
   EngineeringHandoff,
+  FixAuditLogRecord,
   Finding,
   InvestigationResult,
   LedgerEntryRecord,
   PaymentAttemptRecord,
   SupportTicketRecord,
   TimelineEntry,
+  TransactionRecord,
   VendorEvent
 } from "./types.js";
 import { FileVendorApiClient, type VendorApiClient } from "./vendorClient.js";
@@ -44,20 +46,32 @@ export async function investigateTicket(
     }
 
     const paymentAttempt = repository.getPaymentAttempt(ticket.payment_attempt_id);
-    const [customer, account, ledgerEntries, investigationNotes, vendorEvents] = await Promise.all([
+    const [
+      customer,
+      account,
+      transactions,
+      ledgerEntries,
+      investigationNotes,
+      vendorEventRows,
+      fixAuditLog,
+      vendorEvents
+    ] = await Promise.all([
       Promise.resolve(repository.getCustomer(ticket.customer_id)),
       Promise.resolve(repository.getAccount(paymentAttempt.account_id)),
+      Promise.resolve(repository.getTransactions(paymentAttempt.id)),
       Promise.resolve(repository.getLedgerEntries(paymentAttempt.id)),
       Promise.resolve(repository.getInvestigationNotes(ticket.id)),
+      Promise.resolve(repository.getVendorEventRows(paymentAttempt.vendor_reference)),
+      Promise.resolve(repository.getFixAuditLog(ticket.id)),
       vendorClient.getAuthorizationEvents(paymentAttempt.vendor_reference)
     ]);
 
-    const findings = buildFindings(paymentAttempt, ledgerEntries, vendorEvents);
+    const findings = buildFindings(paymentAttempt, ledgerEntries, vendorEventRows, vendorEvents);
     const disposition = buildDisposition(paymentAttempt, ledgerEntries, vendorEvents);
     const customerImpact = buildCustomerImpact(paymentAttempt, ledgerEntries, vendorEvents);
     const engineeringHandoff = buildEngineeringHandoff(paymentAttempt, ledgerEntries, vendorEvents);
-    const timeline = buildTimeline(ticket, paymentAttempt, ledgerEntries, vendorEvents);
-    const auditTrail = buildAuditTrail(generatedAt, ticket, paymentAttempt, ledgerEntries, vendorEvents);
+    const timeline = buildTimeline(ticket, paymentAttempt, transactions, ledgerEntries, fixAuditLog, vendorEvents);
+    const auditTrail = buildAuditTrail(generatedAt, ticket, paymentAttempt, transactions, ledgerEntries, vendorEvents);
     const cxDraft = buildCxDraft(paymentAttempt, vendorEvents);
 
     return {
@@ -66,8 +80,11 @@ export async function investigateTicket(
       customer,
       account,
       paymentAttempt,
+      transactions,
       ledgerEntries,
       investigationNotes,
+      vendorEventRows,
+      fixAuditLog,
       vendorEvents,
       timeline,
       findings,
@@ -86,6 +103,7 @@ export async function investigateTicket(
 function buildFindings(
   paymentAttempt: PaymentAttemptRecord,
   ledgerEntries: LedgerEntryRecord[],
+  vendorEventRows: { id: string; event_type: string }[],
   vendorEvents: VendorEvent[]
 ): Finding[] {
   const findings: Finding[] = [];
@@ -132,6 +150,15 @@ function buildFindings(
       title: "Vendor timeline missing",
       detail: `No vendor events were found for vendor reference ${paymentAttempt.vendor_reference}.`,
       evidence: [paymentAttempt.vendor_reference]
+    });
+  }
+
+  if (vendorEventRows.length === vendorEvents.length && vendorEventRows.length > 0) {
+    findings.push({
+      severity: "info",
+      title: "SQLite vendor event mirror matches mock API fixture count",
+      detail: `The vendor_events SQL mirror contains ${vendorEventRows.length} rows for ${paymentAttempt.vendor_reference}, matching the mock vendor API fixture used by the CLI.`,
+      evidence: vendorEventRows.map((event) => event.id)
     });
   }
 
@@ -214,7 +241,9 @@ function buildEngineeringHandoff(
 function buildTimeline(
   ticket: SupportTicketRecord,
   paymentAttempt: PaymentAttemptRecord,
+  transactions: TransactionRecord[],
   ledgerEntries: LedgerEntryRecord[],
+  fixAuditLog: FixAuditLogRecord[],
   vendorEvents: VendorEvent[]
 ): TimelineEntry[] {
   const timeline: TimelineEntry[] = [
@@ -242,6 +271,13 @@ function buildTimeline(
       detail: `${ticket.subject}.`,
       evidenceId: ticket.id
     },
+    ...transactions.map<TimelineEntry>((transaction) => ({
+      at: transaction.created_at,
+      source: "internal-sql",
+      title: `Transaction ${transaction.transaction_type}`,
+      detail: `${transaction.status} ${formatMoney(transaction.amount_cents, transaction.currency)} transaction row.`,
+      evidenceId: transaction.id
+    })),
     ...ledgerEntries.map<TimelineEntry>((entry) => ({
       at: entry.created_at,
       source: "internal-sql",
@@ -255,6 +291,13 @@ function buildTimeline(
       title: event.type,
       detail: `Vendor event for ${event.vendorReference}.`,
       evidenceId: event.id
+    })),
+    ...fixAuditLog.map<TimelineEntry>((entry) => ({
+      at: entry.created_at,
+      source: "fix-audit-log",
+      title: entry.action,
+      detail: entry.outcome,
+      evidenceId: entry.id
     }))
   ];
 
@@ -268,6 +311,7 @@ function buildAuditTrail(
   generatedAt: string,
   ticket: SupportTicketRecord,
   paymentAttempt: PaymentAttemptRecord,
+  transactions: TransactionRecord[],
   ledgerEntries: LedgerEntryRecord[],
   vendorEvents: VendorEvent[]
 ): AuditTrailEntry[] {
@@ -281,8 +325,8 @@ function buildAuditTrail(
     {
       at: generatedAt,
       actor: "support-lab-cli",
-      action: "Queried payment attempt and ledger entries",
-      evidence: [paymentAttempt.id, ...ledgerEntries.map((entry) => entry.id)].join(", ")
+      action: "Queried payment attempt, transaction, and ledger entries",
+      evidence: [paymentAttempt.id, ...transactions.map((entry) => entry.id), ...ledgerEntries.map((entry) => entry.id)].join(", ")
     },
     {
       at: generatedAt,

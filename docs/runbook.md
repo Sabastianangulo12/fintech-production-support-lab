@@ -36,8 +36,29 @@ WHERE id = 'pay_1001';
 
 ```sql
 SELECT *
+FROM transactions
+WHERE payment_attempt_id = 'pay_1001'
+ORDER BY created_at ASC;
+```
+
+```sql
+SELECT *
 FROM ledger_entries
 WHERE payment_attempt_id = 'pay_1001'
+ORDER BY created_at ASC;
+```
+
+```sql
+SELECT *
+FROM vendor_events
+WHERE vendor_reference = 'ven_auth_8f41_demo'
+ORDER BY created_at ASC;
+```
+
+```sql
+SELECT *
+FROM fix_audit_log
+WHERE ticket_id = 'TCK-1001'
 ORDER BY created_at ASC;
 ```
 

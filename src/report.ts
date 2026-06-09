@@ -27,11 +27,26 @@ export function renderMarkdownReport(result: InvestigationResult): string {
     "## SQL Evidence",
     `- Account ${result.account.id}: ${result.account.status}`,
     `- Payment ${payment.id}: ${payment.status}, ${amount}, ${payment.payment_method_type}, vendor reference ${payment.vendor_reference}`,
+    `- Transactions: ${sentenceList(
+      result.transactions.map(
+        (transaction) =>
+          `${transaction.id}=${transaction.transaction_type}/${transaction.status}/${formatMoney(
+            transaction.amount_cents,
+            transaction.currency
+          )}`
+      )
+    )}`,
     `- Ledger entries: ${sentenceList(
       result.ledgerEntries.map(
         (entry) =>
           `${entry.id}=${entry.entry_type}/${entry.status}/${formatMoney(entry.amount_cents, entry.currency)}`
       )
+    )}`,
+    `- SQLite vendor_events mirror: ${sentenceList(
+      result.vendorEventRows.map((event) => `${event.id}=${event.event_type}`)
+    )}`,
+    `- fix_audit_log rows: ${sentenceList(
+      result.fixAuditLog.map((entry) => `${entry.id}=${entry.action} -> ${entry.outcome}`)
     )}`,
     "",
     "## Vendor Event Correlation",

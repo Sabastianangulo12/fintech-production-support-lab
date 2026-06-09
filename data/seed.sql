@@ -32,10 +32,65 @@ VALUES
     '2026-06-04T19:22:16Z'
   );
 
+INSERT INTO transactions (
+  id,
+  customer_id,
+  account_id,
+  payment_attempt_id,
+  transaction_type,
+  amount_cents,
+  currency,
+  status,
+  external_reference,
+  created_at,
+  updated_at
+)
+VALUES
+  (
+    'txn_1001',
+    'cus_1001',
+    'acct_1001',
+    'pay_1001',
+    'card_authorization',
+    8427,
+    'USD',
+    'authorization_hold_pending_release',
+    'ven_auth_8f41_demo',
+    '2026-06-04T19:22:12Z',
+    '2026-06-04T19:22:18Z'
+  );
+
 INSERT INTO ledger_entries (id, payment_attempt_id, entry_type, amount_cents, currency, status, created_at)
 VALUES
   ('led_1001_auth_hold', 'pay_1001', 'authorization_hold', 8427, 'USD', 'pending_release', '2026-06-04T19:22:12Z'),
   ('led_1001_decline_marker', 'pay_1001', 'decline_marker', 0, 'USD', 'posted', '2026-06-04T19:22:16Z');
+
+INSERT INTO vendor_events (id, payment_attempt_id, vendor_reference, event_type, payload_json, created_at)
+VALUES
+  (
+    'evt_vendor_1001_auth_requested',
+    'pay_1001',
+    'ven_auth_8f41_demo',
+    'authorization.requested',
+    '{"amountCents":8427,"currency":"USD","merchantCategory":"synthetic_checkout","paymentMethodType":"card"}',
+    '2026-06-04T19:22:11Z'
+  ),
+  (
+    'evt_vendor_1001_auth_declined',
+    'pay_1001',
+    'ven_auth_8f41_demo',
+    'authorization.declined',
+    '{"declineCode":"insufficient_funds_demo","networkAdvice":"do_not_retry_without_customer_action"}',
+    '2026-06-04T19:22:15Z'
+  ),
+  (
+    'evt_vendor_1001_reversal_queued',
+    'pay_1001',
+    'ven_auth_8f41_demo',
+    'authorization.reversal_queued',
+    '{"reason":"declined_authorization_hold_release","expectedReleaseWindow":"1-3 business days"}',
+    '2026-06-04T19:22:18Z'
+  );
 
 INSERT INTO support_tickets (
   id,
@@ -69,4 +124,23 @@ VALUES
     'intake',
     'Synthetic intake note: verify internal payment state, ledger hold state, and vendor authorization timeline before responding.',
     '2026-06-04T20:05:12Z'
+  );
+
+INSERT INTO fix_audit_log (id, ticket_id, actor, action, outcome, created_at)
+VALUES
+  (
+    'fixlog_1001_triage_started',
+    'TCK-1001',
+    'support-lab-cli',
+    'Started synthetic production-support investigation',
+    'Ticket linked to customer cus_1001 and payment pay_1001.',
+    '2026-06-04T20:06:01Z'
+  ),
+  (
+    'fixlog_1001_evidence_compared',
+    'TCK-1001',
+    'support-lab-cli',
+    'Compared SQL transaction state with vendor event mirror',
+    'No capture found; reversal is queued but no completion event is present.',
+    '2026-06-04T20:07:34Z'
   );

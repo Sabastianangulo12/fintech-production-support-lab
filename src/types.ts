@@ -27,6 +27,20 @@ export interface PaymentAttemptRecord {
   updated_at: string;
 }
 
+export interface TransactionRecord {
+  id: string;
+  customer_id: string;
+  account_id: string;
+  payment_attempt_id: string;
+  transaction_type: string;
+  amount_cents: number;
+  currency: string;
+  status: string;
+  external_reference: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface LedgerEntryRecord {
   id: string;
   payment_attempt_id: string;
@@ -34,6 +48,15 @@ export interface LedgerEntryRecord {
   amount_cents: number;
   currency: string;
   status: string;
+  created_at: string;
+}
+
+export interface VendorEventRecord {
+  id: string;
+  payment_attempt_id: string;
+  vendor_reference: string;
+  event_type: string;
+  payload_json: string;
   created_at: string;
 }
 
@@ -57,6 +80,15 @@ export interface InvestigationNoteRecord {
   created_at: string;
 }
 
+export interface FixAuditLogRecord {
+  id: string;
+  ticket_id: string;
+  actor: string;
+  action: string;
+  outcome: string;
+  created_at: string;
+}
+
 export interface VendorEvent {
   id: string;
   vendorReference: string;
@@ -67,7 +99,7 @@ export interface VendorEvent {
 
 export interface TimelineEntry {
   at: string;
-  source: "support" | "internal-sql" | "vendor-api";
+  source: "support" | "internal-sql" | "vendor-api" | "fix-audit-log";
   title: string;
   detail: string;
   evidenceId: string;
@@ -100,8 +132,11 @@ export interface InvestigationResult {
   customer: CustomerRecord;
   account: AccountRecord;
   paymentAttempt: PaymentAttemptRecord;
+  transactions: TransactionRecord[];
   ledgerEntries: LedgerEntryRecord[];
   investigationNotes: InvestigationNoteRecord[];
+  vendorEventRows: VendorEventRecord[];
+  fixAuditLog: FixAuditLogRecord[];
   vendorEvents: VendorEvent[];
   timeline: TimelineEntry[];
   findings: Finding[];

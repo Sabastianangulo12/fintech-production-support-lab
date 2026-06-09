@@ -91,6 +91,8 @@ Customer may see the $84.27 pending hold while the reversal/release completes. M
 
 The full report includes SQL evidence, vendor event correlation, known facts, CX response draft, engineering handoff, audit trail, and operational improvement ideas.
 
+The SQLite seed data includes synthetic `customers`, `accounts`, `payment_attempts`, `transactions`, `ledger_entries`, `vendor_events`, `support_tickets`, `investigation_notes`, and `fix_audit_log` records for the first incident.
+
 ## Safety And Data Boundaries
 
 - Uses synthetic data only.

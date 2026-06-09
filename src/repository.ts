@@ -3,10 +3,13 @@ import { required, selectAll, selectOne, toSqlParams } from "./database.js";
 import type {
   AccountRecord,
   CustomerRecord,
+  FixAuditLogRecord,
   InvestigationNoteRecord,
   LedgerEntryRecord,
   PaymentAttemptRecord,
-  SupportTicketRecord
+  SupportTicketRecord,
+  TransactionRecord,
+  VendorEventRecord
 } from "./types.js";
 
 export class InvestigationRepository {
@@ -95,12 +98,62 @@ export class InvestigationRepository {
     );
   }
 
+  getTransactions(paymentAttemptId: string): TransactionRecord[] {
+    return selectAll<TransactionRecord>(
+      this.db,
+      `
+        SELECT
+          id,
+          customer_id,
+          account_id,
+          payment_attempt_id,
+          transaction_type,
+          amount_cents,
+          currency,
+          status,
+          external_reference,
+          created_at,
+          updated_at
+        FROM transactions
+        WHERE payment_attempt_id = $paymentAttemptId
+        ORDER BY created_at ASC, id ASC
+      `,
+      toSqlParams({ $paymentAttemptId: paymentAttemptId })
+    );
+  }
+
+  getVendorEventRows(vendorReference: string): VendorEventRecord[] {
+    return selectAll<VendorEventRecord>(
+      this.db,
+      `
+        SELECT id, payment_attempt_id, vendor_reference, event_type, payload_json, created_at
+        FROM vendor_events
+        WHERE vendor_reference = $vendorReference
+        ORDER BY created_at ASC, id ASC
+      `,
+      toSqlParams({ $vendorReference: vendorReference })
+    );
+  }
+
   getInvestigationNotes(ticketId: string): InvestigationNoteRecord[] {
     return selectAll<InvestigationNoteRecord>(
       this.db,
       `
         SELECT id, ticket_id, note_type, body, created_at
         FROM investigation_notes
+        WHERE ticket_id = $ticketId
+        ORDER BY created_at ASC, id ASC
+      `,
+      toSqlParams({ $ticketId: ticketId })
+    );
+  }
+
+  getFixAuditLog(ticketId: string): FixAuditLogRecord[] {
+    return selectAll<FixAuditLogRecord>(
+      this.db,
+      `
+        SELECT id, ticket_id, actor, action, outcome, created_at
+        FROM fix_audit_log
         WHERE ticket_id = $ticketId
         ORDER BY created_at ASC, id ASC
       `,

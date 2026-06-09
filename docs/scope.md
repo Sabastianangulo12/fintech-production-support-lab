@@ -11,11 +11,14 @@ The project should feel like a realistic support workflow while staying clearly 
 - Synthetic support tickets.
 - Fake customers and accounts.
 - Fake payment attempts.
+- Fake transaction records.
 - Fake ledger entries.
+- Fake vendor event mirror records.
 - Mock vendor API/webhook event payloads.
 - SQL queries for investigation.
 - A TypeScript investigation runner.
 - Generated audit trail with timestamps and evidence references.
+- Seeded `fix_audit_log` records for production-support workflow evidence.
 - Generated handoff report for CX and engineering.
 
 ## Out Of Scope
