@@ -6,6 +6,39 @@ This lab models how a Production Support Engineer investigates a fintech custome
 
 It is not a OnePay clone and does not process real payments, bank data, card data, ACH files, credentials, or personally identifiable information. All customers, transactions, tickets, vendors, identifiers, and events are fake.
 
+## Fast Review
+
+This project is designed to demonstrate the practical workflow behind fintech production support:
+
+- Investigate customer-impacting payment tickets with SQL evidence.
+- Correlate internal records with mock vendor/API events.
+- Generate customer-safe CX language and engineering handoff notes.
+- Expose the investigation through both a CLI and REST API.
+- Automate a repetitive ops check for stale authorization holds.
+- Keep every data point synthetic, auditable, and safe to share publicly.
+
+Reviewer path:
+
+```bash
+npm install
+npm run verify
+npm run api
+```
+
+Then open:
+
+```text
+GET http://127.0.0.1:3000/tickets/TCK-1001/investigation
+GET http://127.0.0.1:3000/tickets/TCK-1002/investigation
+```
+
+## What To Look At First
+
+- [reports/TCK-1001-investigation.md](reports/TCK-1001-investigation.md): card decline plus pending authorization hold.
+- [reports/TCK-1002-investigation.md](reports/TCK-1002-investigation.md): ACH return with ledger offset.
+- [reports/stale-authorization-holds.md](reports/stale-authorization-holds.md): operations automation output.
+- [docs/reviewer-guide.md](docs/reviewer-guide.md): how the project maps to support-engineering work.
+
 ## Why This Exists
 
 Production support in fintech is part debugging, part incident response, part customer communication, and part product judgment. This project is designed to show those muscles in one small, inspectable workflow:
@@ -40,15 +73,20 @@ The intended support workflow:
 - SQL schema and seed data
 - Mock JSON vendor events behind a small vendor-client abstraction
 - CLI-first workflow for reproducible investigations
+- Node HTTP REST API
 - Vitest coverage for the core investigation logic
 
-Planned additions include a small REST API surface, more incident scenarios, and optional AI-assisted wording checks for support communications.
+Implemented support workflows include a card authorization issue, ACH return issue, stale-hold automation, REST API access, and deterministic AI-style support-draft checks.
 
 ## Project Structure
 
 ```text
 docs/
+  ai-support-drafting.md
+  api.md
+  github-publish-checklist.md
   mock-vendor-api.md
+  reviewer-guide.md
   runbook.md
   scope.md
 data/
